@@ -39,10 +39,27 @@ class LiteLLMSettings(LLMSettings):
         """Use `LITELLM_` as prefix for environment variables"""
 
     # Placeholder for LiteLLM specific settings, so far it's empty
+    force_response_schema: bool = False
+    """Pass response_format to OpenAI-compatible gateways unknown to LiteLLM's model registry."""
 
 
 LITELLM_SETTINGS = LiteLLMSettings()
 ACC_COST = 0.0
+
+
+def _redact_sensitive_settings(value: Any, field_name: str = "") -> Any:
+    """Recursively redact credentials before settings reach console or trace logs."""
+
+    secret_markers = ("key", "token", "secret", "password", "credential")
+    if any(marker in field_name.lower() for marker in secret_markers):
+        return "***" if value not in (None, "") else value
+    if isinstance(value, dict):
+        return {key: _redact_sensitive_settings(item, str(key)) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_redact_sensitive_settings(item, field_name) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_redact_sensitive_settings(item, field_name) for item in value)
+    return value
 
 
 class LiteLLMAPIBackend(APIBackend):
@@ -52,8 +69,9 @@ class LiteLLMAPIBackend(APIBackend):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         if not self.__class__._has_logged_settings:
-            logger.info(f"{LITELLM_SETTINGS}")
-            logger.log_object(LITELLM_SETTINGS.model_dump(), tag="LITELLM_SETTINGS")
+            safe_settings = _redact_sensitive_settings(LITELLM_SETTINGS.model_dump())
+            logger.info(f"LiteLLM settings: {safe_settings}")
+            logger.log_object(safe_settings, tag="LITELLM_SETTINGS")
             self.__class__._has_logged_settings = True
         super().__init__(*args, **kwargs)
 
@@ -135,7 +153,10 @@ class LiteLLMAPIBackend(APIBackend):
         Call the chat completion function
         """
 
-        if response_format and not supports_response_schema(model=LITELLM_SETTINGS.chat_model):
+        schema_supported = LITELLM_SETTINGS.force_response_schema or supports_response_schema(
+            model=LITELLM_SETTINGS.chat_model
+        )
+        if response_format and not schema_supported:
             # Deepseek will enter this branch
             logger.warning(
                 f"{LogColors.YELLOW}Model {LITELLM_SETTINGS.chat_model} does not support response schema, ignoring response_format argument.{LogColors.END}",
@@ -227,7 +248,9 @@ class LiteLLMAPIBackend(APIBackend):
         """
         Check if the backend supports function calling
         """
-        return supports_response_schema(model=LITELLM_SETTINGS.chat_model) and LITELLM_SETTINGS.enable_response_schema
+        return (
+            LITELLM_SETTINGS.force_response_schema or supports_response_schema(model=LITELLM_SETTINGS.chat_model)
+        ) and LITELLM_SETTINGS.enable_response_schema
 
     @property
     def chat_token_limit(self) -> int:
