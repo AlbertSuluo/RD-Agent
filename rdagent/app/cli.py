@@ -26,6 +26,7 @@ from rdagent.app.finetune.llm.loop import main as llm_finetune
 from rdagent.app.general_model.general_model import (
     extract_models_and_implement as general_model,
 )
+from rdagent.app.qlib_rd_loop.crypto_factor import main as fin_factor_crypto
 from rdagent.app.qlib_rd_loop.factor import main as fin_factor
 from rdagent.app.qlib_rd_loop.factor_from_report import main as fin_factor_report
 from rdagent.app.qlib_rd_loop.model import main as fin_model
@@ -88,6 +89,40 @@ def fin_factor_cli(
     checkout: CheckoutOption = True,
 ):
     fin_factor(path=path, step_n=step_n, loop_n=loop_n, all_duration=all_duration, checkout=checkout)
+
+
+@app.command(name="fin_factor_crypto")
+def fin_factor_crypto_cli(
+    data_path: Optional[str] = typer.Option(None, "--data-path"),
+    evaluation_path: Optional[str] = typer.Option(None, "--evaluation-path"),
+    baseline_dir: Optional[list[str]] = typer.Option(None, "--baseline-dir"),
+    cache_dir: Optional[str] = typer.Option(None, "--cache-dir"),
+    pfs_threshold: Optional[float] = typer.Option(None, "--pfs-threshold"),
+    rre_threshold: Optional[float] = typer.Option(None, "--rre-threshold"),
+    best_ic_threshold: Optional[float] = typer.Option(None, "--best-ic-threshold"),
+    best_ir_threshold: Optional[float] = typer.Option(None, "--best-ir-threshold"),
+    path: Optional[str] = None,
+    step_n: Optional[int] = None,
+    loop_n: Optional[int] = None,
+    all_duration: Optional[str] = None,
+    checkout: CheckoutOption = True,
+):
+    """Mine hourly cryptocurrency factors with strict deterministic admission gates."""
+    fin_factor_crypto(
+        data_path=data_path,
+        evaluation_path=evaluation_path,
+        baseline_dirs=baseline_dir,
+        cache_dir=cache_dir,
+        pfs_threshold=pfs_threshold,
+        rre_threshold=rre_threshold,
+        best_ic_threshold=best_ic_threshold,
+        best_ir_threshold=best_ir_threshold,
+        path=path,
+        step_n=step_n,
+        loop_n=loop_n,
+        all_duration=all_duration,
+        checkout=checkout,
+    )
 
 
 @app.command(name="fin_model")
